@@ -846,6 +846,61 @@ impl QueryFull {
         self.send_control_request(request).await
     }
 
+    /// Get context usage information
+    ///
+    /// Queries the Claude Code CLI for the current context window utilization.
+    pub async fn get_context_usage(&self) -> Result<serde_json::Value> {
+        let request = json!({
+            "subtype": "context_usage"
+        });
+
+        self.send_control_request(request).await
+    }
+
+    /// Stop a running task
+    ///
+    /// Sends a stop request for the specified task. After this resolves,
+    /// a `task_notification` system message with status `'stopped'` will be
+    /// emitted by the CLI in the message stream.
+    pub async fn stop_task(&self, task_id: &str) -> Result<()> {
+        let request = json!({
+            "subtype": "stop_task",
+            "task_id": task_id
+        });
+
+        self.send_control_request(request).await?;
+        Ok(())
+    }
+
+    /// Reconnect a disconnected or failed MCP server
+    ///
+    /// Use this to retry connecting to an MCP server that failed to connect
+    /// or was disconnected.
+    pub async fn reconnect_mcp_server(&self, server_name: &str) -> Result<()> {
+        let request = json!({
+            "subtype": "mcp_reconnect",
+            "serverName": server_name
+        });
+
+        self.send_control_request(request).await?;
+        Ok(())
+    }
+
+    /// Enable or disable an MCP server
+    ///
+    /// Disabling a server disconnects it and removes its tools from the available
+    /// tool set. Enabling a server reconnects it and makes its tools available again.
+    pub async fn toggle_mcp_server(&self, server_name: &str, enabled: bool) -> Result<()> {
+        let request = json!({
+            "subtype": "mcp_toggle",
+            "serverName": server_name,
+            "enabled": enabled
+        });
+
+        self.send_control_request(request).await?;
+        Ok(())
+    }
+
     /// Handle SDK MCP request by routing to the appropriate server
     ///
     /// This function wraps the server's response in a proper JSONRPC 2.0 format,

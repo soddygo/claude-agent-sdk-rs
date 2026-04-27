@@ -1001,6 +1001,186 @@ impl ClaudeClient {
         query.get_mcp_status().await
     }
 
+    /// Get context usage information
+    ///
+    /// Queries the Claude Code CLI for the current context window utilization,
+    /// returning a breakdown of tokens used by different categories.
+    ///
+    /// # Returns
+    ///
+    /// `ContextUsageResponse` with:
+    /// - `categories`: Token breakdown by category (memory files, MCP tools, agents, etc.)
+    /// - `total_tokens`: Total tokens used
+    /// - `max_tokens`: Maximum context window
+    /// - `percentage`: Context utilization percentage
+    /// - `model`: Current model
+    /// - And more context utilization details
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or if the request fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use claude_code_agent_sdk::{ClaudeClient, ClaudeAgentOptions};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let mut client = ClaudeClient::new(ClaudeAgentOptions::default());
+    /// # client.connect().await?;
+    /// # client.query("Hello").await?;
+    /// if let Ok(usage) = client.get_context_usage().await {
+    ///     println!("Context usage: {}% ({} / {} tokens)",
+    ///         usage.percentage, usage.total_tokens, usage.max_tokens);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_context_usage(&self) -> Result<crate::types::context::ContextUsageResponse> {
+        let query_manager = self.query_manager.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("Client not connected. Call connect() first.".to_string())
+        })?;
+
+        let query_id = self.current_query_id.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("No active query. Call query() first.".to_string())
+        })?;
+
+        let query = query_manager.get_query(query_id)?;
+        let response = query.get_context_usage().await?;
+        let usage = serde_json::from_value(response).map_err(|e| {
+            ClaudeError::InvalidConfig(format!("Failed to parse context usage response: {}", e))
+        })?;
+        Ok(usage)
+    }
+
+    /// Stop a running task
+    ///
+    /// Sends a stop request for the specified task. After this resolves,
+    /// a `task_notification` system message with status `'stopped'` will be
+    /// emitted by the CLI in the message stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `task_id` - The task ID from `task_notification` events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or if sending fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use claude_code_agent_sdk::{ClaudeClient, ClaudeAgentOptions};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let mut client = ClaudeClient::new(ClaudeAgentOptions::default());
+    /// # client.connect().await?;
+    /// # client.query("Start a long task").await?;
+    /// # // Assume we received a task_notification with task_id "task-abc123"
+    /// client.stop_task("task-abc123").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn stop_task(&self, task_id: &str) -> Result<()> {
+        let query_manager = self.query_manager.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("Client not connected. Call connect() first.".to_string())
+        })?;
+
+        let query_id = self.current_query_id.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("No active query. Call query() first.".to_string())
+        })?;
+
+        let query = query_manager.get_query(query_id)?;
+        query.stop_task(task_id).await
+    }
+
+    /// Reconnect a disconnected or failed MCP server
+    ///
+    /// Use this to retry connecting to an MCP server that failed to connect
+    /// or was disconnected. Raises an error if the reconnection fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `server_name` - The name of the MCP server to reconnect
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or if reconnection fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use claude_code_agent_sdk::{ClaudeClient, ClaudeAgentOptions};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let mut client = ClaudeClient::new(ClaudeAgentOptions::default());
+    /// # client.connect().await?;
+    /// # client.query("Hello").await?;
+    /// let status = client.get_mcp_status().await?;
+    /// for server in status.get("mcpServers").unwrap().as_array().unwrap() {
+    ///     if server.get("status") == "failed" {
+    ///         client.reconnect_mcp_server(server.get("name").unwrap().as_str().unwrap()).await?;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn reconnect_mcp_server(&self, server_name: &str) -> Result<()> {
+        let query_manager = self.query_manager.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("Client not connected. Call connect() first.".to_string())
+        })?;
+
+        let query_id = self.current_query_id.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("No active query. Call query() first.".to_string())
+        })?;
+
+        let query = query_manager.get_query(query_id)?;
+        query.reconnect_mcp_server(server_name).await
+    }
+
+    /// Enable or disable an MCP server
+    ///
+    /// Disabling a server disconnects it and removes its tools from the available
+    /// tool set. Enabling a server reconnects it and makes its tools available again.
+    ///
+    /// # Arguments
+    ///
+    /// * `server_name` - The name of the MCP server to toggle
+    /// * `enabled` - Whether to enable (true) or disable (false) the server
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or if the operation fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use claude_code_agent_sdk::{ClaudeClient, ClaudeAgentOptions};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let mut client = ClaudeClient::new(ClaudeAgentOptions::default());
+    /// # client.connect().await?;
+    /// # client.query("Hello").await?;
+    /// // Disable an MCP server
+    /// client.toggle_mcp_server("my-server", false).await?;
+    /// // Re-enable it later
+    /// client.toggle_mcp_server("my-server", true).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn toggle_mcp_server(&self, server_name: &str, enabled: bool) -> Result<()> {
+        let query_manager = self.query_manager.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("Client not connected. Call connect() first.".to_string())
+        })?;
+
+        let query_id = self.current_query_id.as_ref().ok_or_else(|| {
+            ClaudeError::InvalidConfig("No active query. Call query() first.".to_string())
+        })?;
+
+        let query = query_manager.get_query(query_id)?;
+        query.toggle_mcp_server(server_name, enabled).await
+    }
+
     /// Start a new session by switching to a different session ID
     ///
     /// This is a convenience method that creates a new conversation context.

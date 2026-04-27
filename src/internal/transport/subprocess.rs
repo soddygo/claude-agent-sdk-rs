@@ -435,6 +435,36 @@ impl SubprocessTransport {
             args.push(max_thinking.to_string());
         }
 
+        // Add thinking config (takes precedence over max_thinking_tokens)
+        if let Some(ref thinking) = self.options.thinking {
+            match thinking {
+                crate::types::config::ThinkingConfig::Adaptive => {
+                    args.push("--thinking".to_string());
+                    args.push("adaptive".to_string());
+                }
+                crate::types::config::ThinkingConfig::Enabled { budget_tokens } => {
+                    args.push("--thinking".to_string());
+                    args.push(format!("enabled,budget={}", budget_tokens));
+                }
+                crate::types::config::ThinkingConfig::Disabled => {
+                    args.push("--thinking".to_string());
+                    args.push("disabled".to_string());
+                }
+            }
+        }
+
+        // Add effort level
+        if let Some(ref effort) = self.options.effort {
+            args.push("--effort".to_string());
+            let effort_str = match effort {
+                crate::types::config::Effort::Low => "low",
+                crate::types::config::Effort::Medium => "medium",
+                crate::types::config::Effort::High => "high",
+                crate::types::config::Effort::Max => "max",
+            };
+            args.push(effort_str.to_string());
+        }
+
         // Add permission prompt tool name
         if let Some(ref tool_name) = self.options.permission_prompt_tool_name {
             args.push("--permission-prompt-tool".to_string());
@@ -479,6 +509,22 @@ impl SubprocessTransport {
         for dir in &self.options.add_dirs {
             args.push("--add-dir".to_string());
             args.push(dir.display().to_string());
+        }
+
+        // Add skills
+        if let Some(ref skills) = self.options.skills {
+            match skills {
+                crate::types::config::SkillsConfig::All => {
+                    args.push("--skills".to_string());
+                    args.push("all".to_string());
+                }
+                crate::types::config::SkillsConfig::List(skill_list) => {
+                    for skill in skill_list {
+                        args.push("--skills".to_string());
+                        args.push(skill.clone());
+                    }
+                }
+            }
         }
 
         // Add include partial messages

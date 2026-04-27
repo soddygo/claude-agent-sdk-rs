@@ -58,8 +58,20 @@ pub struct ClaudeAgentOptions {
     #[builder(default, setter(strip_option))]
     pub max_budget_usd: Option<f64>,
     /// Maximum tokens for thinking blocks
+    /// @deprecated Use `thinking` instead.
     #[builder(default, setter(strip_option))]
     pub max_thinking_tokens: Option<u32>,
+    /// Controls extended thinking behavior. Takes precedence over max_thinking_tokens.
+    #[builder(default, setter(strip_option))]
+    pub thinking: Option<ThinkingConfig>,
+    /// Effort level for thinking depth.
+    #[builder(default, setter(strip_option))]
+    pub effort: Option<Effort>,
+    /// Task budget for token pacing.
+    /// When set, the model is made aware of its remaining token budget so it can
+    /// pace tool use and wrap up before the limit.
+    #[builder(default, setter(strip_option))]
+    pub task_budget: Option<TaskBudget>,
     /// Tool name for permission prompts
     #[builder(default, setter(into, strip_option))]
     pub permission_prompt_tool_name: Option<String>,
@@ -121,6 +133,10 @@ pub struct ClaudeAgentOptions {
     /// Plugin configurations for custom plugins
     #[builder(default, setter(into))]
     pub plugins: Vec<SdkPluginConfig>,
+    /// Skills to enable for this session.
+    /// Set to `SkillsConfig::All` to enable all skills, or provide a list of specific skill names.
+    #[builder(default, setter(strip_option))]
+    pub skills: Option<SkillsConfig>,
     /// Output format for structured outputs (matches Messages API structure)
     /// Example: `json!({"type": "json_schema", "schema": {"type": "object", "properties": {...}}})`
     #[builder(default, setter(strip_option))]
@@ -296,6 +312,84 @@ pub enum SdkBeta {
     /// Extended context window (1M tokens)
     #[serde(rename = "context-1m-2025-08-07")]
     Context1M,
+}
+
+/// Task budget for token pacing
+///
+/// When set, the model is made aware of its remaining token budget so it can
+/// pace tool use and wrap up before the limit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBudget {
+    /// Total token budget
+    pub total: u32,
+}
+
+/// Thinking configuration for extended thinking blocks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ThinkingConfig {
+    /// Adaptive thinking - model decides how much to think
+    #[serde(rename = "adaptive")]
+    Adaptive,
+    /// Enabled thinking with specific token budget
+    #[serde(rename = "enabled")]
+    Enabled {
+        /// Token budget for thinking
+        budget_tokens: u32,
+    },
+    /// Disabled thinking
+    #[serde(rename = "disabled")]
+    Disabled,
+}
+
+impl ThinkingConfig {
+    /// Create adaptive thinking config
+    pub fn adaptive() -> Self {
+        ThinkingConfig::Adaptive
+    }
+
+    /// Create enabled thinking config with budget
+    pub fn enabled(budget_tokens: u32) -> Self {
+        ThinkingConfig::Enabled { budget_tokens }
+    }
+
+    /// Create disabled thinking config
+    pub fn disabled() -> Self {
+        ThinkingConfig::Disabled
+    }
+}
+
+/// Effort level for thinking depth
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Effort {
+    Low,
+    Medium,
+    High,
+    Max,
+}
+
+/// Skills configuration
+/// Specifies which skills to enable for the session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SkillsConfig {
+    /// Enable all skills
+    All,
+    /// Enable specific skills by name
+    List(Vec<String>),
+}
+
+impl SkillsConfig {
+    /// Enable all skills
+    pub fn all() -> Self {
+        SkillsConfig::All
+    }
+
+    /// Enable specific skills
+    pub fn list(skills: Vec<String>) -> Self {
+        SkillsConfig::List(skills)
+    }
 }
 
 /// Tools configuration

@@ -339,13 +339,24 @@ pub mod client;
 pub mod errors;
 mod internal;
 pub mod query;
+pub mod session_store;
 pub mod types;
 pub mod version;
 
 // Re-export commonly used types
 pub use errors::{ClaudeError, ImageValidationError, Result};
+pub use session_store::{
+    delete_session, fork_session, get_session_info, get_session_messages, get_session_messages_from_store,
+    get_session_info_from_store, get_subagent_messages, get_subagent_messages_from_store,
+    list_sessions, list_sessions_from_store, list_subagents, list_subagents_from_store,
+    project_key_for_directory, rename_session, tag_session, session_exists,
+    InMemorySessionStore, MaterializedResume, TranscriptMirrorBatcher,
+    ForkSessionResult, SDKSessionInfo, SessionKey, SessionListEntry, SessionMessage,
+    SessionStore, SessionStoreEntry,
+};
 pub use types::{
     config::*,
+    context::{ContextUsageCategory, ContextUsageResponse},
     efficiency::EfficiencyConfig,
     hooks::*,
     mcp::{
@@ -368,6 +379,7 @@ pub use types::{
     messages::*,
     permissions::*,
     plugin::*,
+    session_store::SessionListSubkeysKey,
 };
 
 // Re-export public API

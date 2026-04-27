@@ -815,3 +815,168 @@ mod tests {
         assert_eq!(json["tool_use_result"]["status"], "ok");
     }
 }
+
+// ============================================================================
+// Additional Message Types (from Python SDK)
+// ============================================================================
+
+/// Rate limit status literals
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RateLimitStatus {
+    /// Rate limit is active
+    Active,
+    /// Rate limit is inactive
+    Inactive,
+}
+
+/// Rate limit type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RateLimitType {
+    /// Tokens per minute
+    Tokens,
+    /// Requests per minute
+    Requests,
+    /// Credits
+    Credits,
+}
+
+/// Rate limit information
+///
+/// Emitted when rate limit status changes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateLimitInfo {
+    /// Current rate limit status
+    pub status: RateLimitStatus,
+    /// Unix timestamp when the rate limit window resets
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resets_at: Option<String>,
+    /// Which rate limit window applies
+    pub rate_limit_type: RateLimitType,
+    /// Fraction of the rate limit consumed (0.0 - 1.0)
+    pub utilization: f32,
+    /// Status of overage/pay-as-you-go usage if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_status: Option<RateLimitStatus>,
+    /// Unix timestamp when overage window resets
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overage_resets_at: Option<String>,
+}
+
+/// Rate limit event emitted when rate limit info changes
+///
+/// The CLI emits this whenever the rate limit status transitions
+/// (e.g. from ``allowed`` to ``allowed_warning``).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateLimitEvent {
+    /// Rate limit information
+    pub rate_limit_info: RateLimitInfo,
+    /// UUID for this event
+    pub uuid: String,
+    /// Session ID
+    pub session_id: String,
+}
+
+/// Mirror error message
+///
+/// Emitted when a transcript mirror operation fails.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MirrorErrorMessage {
+    /// Error key identifier
+    pub key: String,
+    /// Error message
+    pub error: String,
+}
+
+/// Task notification status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskNotificationStatus {
+    /// Task completed successfully
+    Completed,
+    /// Task failed
+    Failed,
+    /// Task was stopped
+    Stopped,
+}
+
+/// Usage statistics reported in task_progress and task_notification messages
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskUsage {
+    /// Total tokens used
+    pub total_tokens: u32,
+    /// Number of tool uses
+    pub tool_uses: u32,
+    /// Duration in milliseconds
+    pub duration_ms: u32,
+}
+
+/// Task started message
+///
+/// System message emitted when a task starts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskStartedMessage {
+    /// Task identifier
+    pub task_id: String,
+    /// Task description
+    pub description: String,
+    /// UUID for this message
+    pub uuid: String,
+    /// Session identifier
+    pub session_id: String,
+    /// Tool use ID if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_use_id: Option<String>,
+    /// Type of task
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_type: Option<String>,
+}
+
+/// Task progress message
+///
+/// System message emitted while a task is in progress.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskProgressMessage {
+    /// Task identifier
+    pub task_id: String,
+    /// Task description
+    pub description: String,
+    /// Usage statistics
+    pub usage: TaskUsage,
+    /// UUID for this message
+    pub uuid: String,
+    /// Session identifier
+    pub session_id: String,
+    /// Tool use ID if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_use_id: Option<String>,
+    /// Last tool name used
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_tool_name: Option<String>,
+}
+
+/// Task notification message
+///
+/// System message emitted when a task completes, fails, or is stopped.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskNotificationMessage {
+    /// Task identifier
+    pub task_id: String,
+    /// Task status
+    pub status: TaskNotificationStatus,
+    /// Output file path
+    pub output_file: String,
+    /// Task summary
+    pub summary: String,
+    /// UUID for this message
+    pub uuid: String,
+    /// Session identifier
+    pub session_id: String,
+    /// Tool use ID if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_use_id: Option<String>,
+    /// Usage statistics
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<TaskUsage>,
+}
